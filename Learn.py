@@ -51,12 +51,14 @@ def depleted_resources(obs):
     return True
 
 
-def create_dataset_from_json(episode_dir, team_name='Toad Brigade'):
+def create_dataset_from_json(episode_dir, team_name='Toad Brigade', set_size=0):
     obses = {}
     samples = []
     append = samples.append
     episodes = [path for path in Path(episode_dir).glob('*.json') if
                 ('output' not in path.name and '_info' not in path.name)]
+
+    print('create_dataset_from_json')
     for filepath in episodes:
 
         with open(filepath) as f:
@@ -66,6 +68,11 @@ def create_dataset_from_json(episode_dir, team_name='Toad Brigade'):
         index = np.argmax([r or 0 for r in json_load['rewards']])
         if json_load['info']['TeamNames'][index] != team_name:
             continue
+
+        if set_size!=0:
+            this_size = json_load['steps'][0][0]['observation']['height']
+            if set_size != this_size:
+                continue
 
         for i in range(len(json_load['steps']) - 1):
             if json_load['steps'][i][index]['status'] == 'ACTIVE':
@@ -94,13 +101,13 @@ def create_dataset_from_json(episode_dir, team_name='Toad Brigade'):
 
 
 # Input for Neural Network
-def make_input(obs, unit_id):
+def make_input(obs, unit_id, size=32):
     width, height = obs['width'], obs['height']
-    x_shift = (32 - width) // 2
-    y_shift = (32 - height) // 2
+    x_shift = (size - width) // 2
+    y_shift = (size - height) // 2
     cities = {}
 
-    b = np.zeros((20, 32, 32), dtype=np.float32)
+    b = np.zeros((20, size, size), dtype=np.float32)
 
     for update in obs['updates']:
         strs = update.split(' ')
@@ -163,15 +170,16 @@ def make_input(obs, unit_id):
     # Turns
     b[18, :] = obs['step'] / 360
     # Map Size
-    b[19, x_shift:32 - x_shift, y_shift:32 - y_shift] = 1
+    b[19, x_shift:size - x_shift, y_shift:size - y_shift] = 1
 
     return b
 
 
 class LuxDataset(Dataset):
-    def __init__(self, obses, samples):
+    def __init__(self, obses, samples, size=32):
         self.obses = obses
         self.samples = samples
+        self.size = size
 
     def __len__(self):
         return len(self.samples)
@@ -179,7 +187,7 @@ class LuxDataset(Dataset):
     def __getitem__(self, idx):
         obs_id, unit_id, action = self.samples[idx]
         obs = self.obses[obs_id]
-        state = make_input(obs, unit_id)
+        state = make_input(obs, unit_id, self.size)
 
         return state, action
 
@@ -229,9 +237,9 @@ class BasicConv2d(nn.Module):
 
 
 class LuxNet(nn.Module):
-    def __init__(self):
+    def __init__(self, map_size = 32):
         super().__init__()
-        layers, filters = 12, 32
+        layers, filters = 12, map_size
         self.conv0 = BasicConv2d(20, filters, (3, 3), True)
         self.blocks = nn.ModuleList([BasicConv2d(filters, filters, (3, 3), True) for _ in range(layers)])
         self.head_p = nn.Linear(filters, 5, bias=False)
@@ -251,13 +259,21 @@ def get_time():
     return now.strftime("%H:%M:%S")
 
 
-def train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs):
+def train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs, map_size=32, skip_first_train=True):
     best_acc = 0.0
+
+    num_train = len(dataloaders_dict['train'])
+    num_val = len(dataloaders_dict['val'])
+    print(f'LR: {optimizer.param_groups[0]["lr"]} Epochs {num_epochs} | #train{num_train} #val{num_val}')
+
     for epoch in range(num_epochs):
         model.cuda()
 
         for phase in ['train', 'val']:
             if phase == 'train':
+                if epoch == 0 and skip_first_train:
+                    continue
+
                 model.train()
             else:
                 model.eval()
@@ -267,10 +283,8 @@ def train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_ep
 
             dataloader = dataloaders_dict[phase]
 
-            print(get_time(),f'LR: {optimizer.param_groups[0]["lr"]} Epoch {epoch + 1}/{num_epochs} | {phase:^5}',
-                  len(dataloader), 'items')
-
-            for item in tqdm(dataloader, leave=False):
+            # for item in tqdm(dataloader, leave=False):
+            for item in dataloader:
 
                 states = item[0].cuda().float()
                 actions = item[1].cuda().long()
@@ -293,17 +307,17 @@ def train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_ep
             epoch_loss = epoch_loss / data_size
             epoch_acc = epoch_acc.double() / data_size
 
-            print(
+            print(get_time(),
                 f'LR: {optimizer.param_groups[0]["lr"]} Epoch {epoch + 1}/{num_epochs} | {phase:^5} | Loss: {epoch_loss:.4f} | Acc: {epoch_acc:.4f}')
 
         if epoch_acc > best_acc:
-            traced = torch.jit.trace(model.cpu(), torch.rand(1, 20, 32, 32))
+            traced = torch.jit.trace(model.cpu(), torch.rand(1, 20, map_size, map_size))
             traced.save('model.pth')
             print(
                 f'Saved model.pth from epoch {epoch + 1} as it is the most accurate so far: Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
             best_acc = epoch_acc
 
-        traced = torch.jit.trace(model.cpu(), torch.rand(1, 20, 32, 32))
+        traced = torch.jit.trace(model.cpu(), torch.rand(1, 20, map_size, map_size))
         traced.save(f'model_{epoch + 1}.pth')
 
         scheduler.step(epoch_loss)
@@ -314,11 +328,15 @@ def main():
     seed = 42
     seed_everything(seed)
 
-    model = LuxNet()
-    # model = torch.jit.load('../input/models/model8050.pth')
+    # map size to analyse
+    map_size = 12
 
-    do_print = False
-    obses, samples = create_dataset_from_json(episode_dir)
+    # model = LuxNet(map_size = map_size)
+    model = torch.jit.load('./model_start.pth')
+#LR: 5e-06 Epoch 6/100 |  val  | Loss: 0.6575 | Acc: 0.7408
+
+    do_print = True
+    obses, samples = create_dataset_from_json(episode_dir, set_size=map_size)
     if do_print:
         print('obses:', len(obses), 'samples:', len(samples))
 
@@ -331,13 +349,13 @@ def main():
     train, val = train_test_split(samples, test_size=0.1, random_state=42, stratify=labels)
     batch_size = 64
     train_loader = DataLoader(
-        LuxDataset(obses, train),
+        LuxDataset(obses, train, size = map_size),
         batch_size=batch_size,
         shuffle=True,
         num_workers=2
     )
     val_loader = DataLoader(
-        LuxDataset(obses, val),
+        LuxDataset(obses, val, size = map_size),
         batch_size=batch_size,
         shuffle=False,
         num_workers=2
@@ -353,9 +371,9 @@ def main():
     # optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5)
     # train_model(model, dataloaders_dict, criterion, optimizer, num_epochs=3,best_acc = 0.7966)
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-05)
-    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.05, patience=2)
-    train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs=15)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-03)
+    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=5)
+    train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs=100, map_size=map_size)
 
 
 if __name__ == '__main__':
