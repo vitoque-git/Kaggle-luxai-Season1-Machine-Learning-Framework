@@ -29,9 +29,6 @@ def seed_everything(seed_value):
         torch.backends.cudnn.benchmark = True
 
 
-
-
-
 def to_label(action):
     strs = action.split(' ')
     unit_id = strs[1]
@@ -51,7 +48,7 @@ def depleted_resources(obs):
     return True
 
 
-def create_dataset_from_json(episode_dir, team_name='Toad Brigade', set_size=0):
+def create_dataset_from_json(episode_dir, team_name='Toad Brigade', set_sizes=[]):
     obses = {}
     samples = []
     append = samples.append
@@ -69,9 +66,9 @@ def create_dataset_from_json(episode_dir, team_name='Toad Brigade', set_size=0):
         if json_load['info']['TeamNames'][index] != team_name:
             continue
 
-        if set_size!=0:
+        if len(set_sizes) != 0:
             this_size = json_load['steps'][0][0]['observation']['height']
-            if set_size != this_size:
+            if this_size not in set_sizes:
                 continue
 
         for i in range(len(json_load['steps']) - 1):
@@ -97,8 +94,7 @@ def create_dataset_from_json(episode_dir, team_name='Toad Brigade', set_size=0):
 
     return obses, samples
 
-
-
+CHANNELS = 25
 
 # Input for Neural Network
 def make_input(obs, unit_id, size=32):
@@ -107,7 +103,27 @@ def make_input(obs, unit_id, size=32):
     y_shift = (size - height) // 2
     cities = {}
 
-    b = np.zeros((20, size, size), dtype=np.float32)
+    turn = obs['step']
+    MAX_DAYS = 360
+    DAY_LENGTH = 30
+    NIGHT_LENGTH = 10
+    FULL_LENTH = DAY_LENGTH + NIGHT_LENGTH
+
+    all_night_turns_lef = ((MAX_DAYS - 1 - turn) // FULL_LENTH + 1) * NIGHT_LENGTH
+
+    turns_to_night = (DAY_LENGTH - turn) % FULL_LENTH
+    turns_to_night = 0 if turns_to_night > 30 else turns_to_night
+
+    turns_to_dawn = FULL_LENTH - turn % FULL_LENTH
+    turns_to_dawn = 0 if turns_to_dawn > 10 else turns_to_dawn
+
+    if turns_to_night == 0:
+        all_night_turns_lef -= (10 - turns_to_dawn)
+
+    steps_until_night = 30 - turn % 40
+    next_night_number_turn = min(10, 10 + steps_until_night)
+
+    b = np.zeros((CHANNELS, size, size), dtype=np.float32)
 
     for update in obs['updates']:
         strs = update.split(' ')
@@ -119,17 +135,19 @@ def make_input(obs, unit_id, size=32):
             wood = int(strs[7])
             coal = int(strs[8])
             uranium = int(strs[9])
+            fuel = wood + coal * 10 + uranium * 40
             if unit_id == strs[3]:
                 # Position and Cargo
-                b[:2, x, y] = (
+                b[:3, x, y] = (
                     1,
-                    (wood + coal + uranium) / 100
+                    (wood + coal + uranium) / 100,
+                    fuel / 4000
                 )
             else:
                 # Units
                 team = int(strs[2])
                 cooldown = float(strs[6])
-                idx = 2 + (team - obs['player']) % 2 * 3
+                idx = 3 + (team - obs['player']) % 2 * 3
                 b[idx:idx + 3, x, y] = (
                     1,
                     cooldown / 6,
@@ -141,10 +159,12 @@ def make_input(obs, unit_id, size=32):
             city_id = strs[2]
             x = int(strs[3]) + x_shift
             y = int(strs[4]) + y_shift
-            idx = 8 + (team - obs['player']) % 2 * 2
-            b[idx:idx + 2, x, y] = (
+            idx = 9 + (team - obs['player']) % 2 * 4
+            b[idx:idx + 4, x, y] = (
                 1,
-                cities[city_id]
+                cities[city_id][0],
+                cities[city_id][1],
+                cities[city_id][2]
             )
         elif input_identifier == 'r':
             # Resources
@@ -152,34 +172,40 @@ def make_input(obs, unit_id, size=32):
             x = int(strs[2]) + x_shift
             y = int(strs[3]) + y_shift
             amt = int(float(strs[4]))
-            b[{'wood': 12, 'coal': 13, 'uranium': 14}[r_type], x, y] = amt / 800
+            b[{'wood': 17, 'coal': 18, 'uranium': 19}[r_type], x, y] = amt / 800
         elif input_identifier == 'rp':
             # Research Points
             team = int(strs[1])
             rp = int(strs[2])
-            b[15 + (team - obs['player']) % 2, :] = min(rp, 200) / 200
+            b[20 + (team - obs['player']) % 2, :] = min(rp, 200) / 200
         elif input_identifier == 'c':
             # Cities
             city_id = strs[2]
             fuel = float(strs[3])
             lightupkeep = float(strs[4])
-            cities[city_id] = min(fuel / lightupkeep, 10) / 10
+            autonomy = int(fuel) // int(lightupkeep)
+            will_live = autonomy >= all_night_turns_lef
+            will_live_next_night = autonomy >= next_night_number_turn
+            cities[city_id] = (
+                int(will_live_next_night),
+                int(will_live),
+                min(autonomy, 10) / 10)
 
     # Day/Night Cycle
-    b[17, :] = obs['step'] % 40 / 40
+    b[22, :] = obs['step'] % 40 / 40
     # Turns
-    b[18, :] = obs['step'] / 360
+    b[23, :] = obs['step'] / 360
     # Map Size
-    b[19, x_shift:size - x_shift, y_shift:size - y_shift] = 1
+    b[24, x_shift:size - x_shift, y_shift:size - y_shift] = 1
 
     return b
 
 
 class LuxDataset(Dataset):
-    def __init__(self, obses, samples, size=32):
+    def __init__(self, obses, samples, make_input_size=32):
         self.obses = obses
         self.samples = samples
-        self.size = size
+        self.make_input_size = make_input_size
 
     def __len__(self):
         return len(self.samples)
@@ -187,7 +213,7 @@ class LuxDataset(Dataset):
     def __getitem__(self, idx):
         obs_id, unit_id, action = self.samples[idx]
         obs = self.obses[obs_id]
-        state = make_input(obs, unit_id, self.size)
+        state = make_input(obs, unit_id, self.make_input_size)
 
         return state, action
 
@@ -237,10 +263,10 @@ class BasicConv2d(nn.Module):
 
 
 class LuxNet(nn.Module):
-    def __init__(self, map_size = 32):
+    def __init__(self, filt=32):
         super().__init__()
-        layers, filters = 12, map_size
-        self.conv0 = BasicConv2d(20, filters, (3, 3), True)
+        layers, filters = 12, filt
+        self.conv0 = BasicConv2d(CHANNELS, filters, (3, 3), True)
         self.blocks = nn.ModuleList([BasicConv2d(filters, filters, (3, 3), True) for _ in range(layers)])
         self.head_p = nn.Linear(filters, 5, bias=False)
 
@@ -252,14 +278,18 @@ class LuxNet(nn.Module):
         p = self.head_p(h_head)
         return p
 
+
 from datetime import datetime
+
+
 def get_time():
     now = datetime.now()
 
     return now.strftime("%H:%M:%S")
 
 
-def train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs, map_size=32, skip_first_train=True):
+def train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs, map_size=32,
+                skip_first_train=True):
     best_acc = 0.0
 
     num_train = len(dataloaders_dict['train'])
@@ -308,16 +338,16 @@ def train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_ep
             epoch_acc = epoch_acc.double() / data_size
 
             print(get_time(),
-                f'LR: {optimizer.param_groups[0]["lr"]} Epoch {epoch + 1}/{num_epochs} | {phase:^5} | Loss: {epoch_loss:.4f} | Acc: {epoch_acc:.4f}')
+                  f'LR: {optimizer.param_groups[0]["lr"]} Epoch {epoch + 1}/{num_epochs} | {phase:^5} | Loss: {epoch_loss:.4f} | Acc: {epoch_acc:.4f}')
 
         if epoch_acc > best_acc:
-            traced = torch.jit.trace(model.cpu(), torch.rand(1, 20, map_size, map_size))
+            traced = torch.jit.trace(model.cpu(), torch.rand(1, CHANNELS, map_size, map_size))
             traced.save('model.pth')
             print(
                 f'Saved model.pth from epoch {epoch + 1} as it is the most accurate so far: Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
             best_acc = epoch_acc
 
-        traced = torch.jit.trace(model.cpu(), torch.rand(1, 20, map_size, map_size))
+        traced = torch.jit.trace(model.cpu(), torch.rand(1, CHANNELS, map_size, map_size))
         traced.save(f'model_{epoch + 1}.pth')
 
         scheduler.step(epoch_loss)
@@ -329,14 +359,16 @@ def main():
     seed_everything(seed)
 
     # map size to analyse
-    map_size = 12
+    map_size = 16
+    make_input_size = map_size
+    filters = 48
+    dataset_sizes = [12,16]
+    model = LuxNet(filt=filters); skip_first = False
+    # model = torch.jit.load('./model12_48.pth'); skip_first = True
 
-    # model = LuxNet(map_size = map_size)
-    model = torch.jit.load('./model_start.pth')
-#LR: 5e-06 Epoch 6/100 |  val  | Loss: 0.6575 | Acc: 0.7408
 
     do_print = True
-    obses, samples = create_dataset_from_json(episode_dir, set_size=map_size)
+    obses, samples = create_dataset_from_json(episode_dir, set_sizes=dataset_sizes)
     if do_print:
         print('obses:', len(obses), 'samples:', len(samples))
 
@@ -349,31 +381,30 @@ def main():
     train, val = train_test_split(samples, test_size=0.1, random_state=42, stratify=labels)
     batch_size = 64
     train_loader = DataLoader(
-        LuxDataset(obses, train, size = map_size),
+        LuxDataset(obses, train, make_input_size=make_input_size),
         batch_size=batch_size,
         shuffle=True,
         num_workers=2
     )
     val_loader = DataLoader(
-        LuxDataset(obses, val, size = map_size),
+        LuxDataset(obses, val, make_input_size=make_input_size),
         batch_size=batch_size,
         shuffle=False,
         num_workers=2
     )
     dataloaders_dict = {"train": train_loader, "val": val_loader}
     criterion = nn.CrossEntropyLoss()
-    # optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
 
     # optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
     # train_model(model, dataloaders_dict, criterion, optimizer, num_epochs=10)
     # optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
-    # train_model(model, dataloaders_dict, criterion, optimizer, num_epochs=10)
-    # optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5)
-    # train_model(model, dataloaders_dict, criterion, optimizer, num_epochs=3,best_acc = 0.7966)
 
+
+    # optimizer = torch.optim.AdamW(model.parameters(), lr=1e-03)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-03)
-    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=5)
-    train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs=100, map_size=map_size)
+    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=2)
+    train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs=100, map_size=map_size,
+                skip_first_train=skip_first)
 
 
 if __name__ == '__main__':
