@@ -36,10 +36,11 @@ def to_label(action):
         label = {'c': None, 'n': 0, 's': 1, 'w': 2, 'e': 3}[strs[2]]
     elif strs[0] == 'bcity':
         label = 4
+    elif strs[0] == 't':
+        label = 5
     else:
         label = None
     return unit_id, label
-
 
 def depleted_resources(obs):
     for u in obs['updates']:
@@ -268,7 +269,7 @@ class LuxNet(nn.Module):
         layers, filters = 12, filt
         self.conv0 = BasicConv2d(CHANNELS, filters, (3, 3), True)
         self.blocks = nn.ModuleList([BasicConv2d(filters, filters, (3, 3), True) for _ in range(layers)])
-        self.head_p = nn.Linear(filters, 5, bias=False)
+        self.head_p = nn.Linear(filters, 6, bias=False)
 
     def forward(self, x):
         h = F.relu_(self.conv0(x))
@@ -294,7 +295,7 @@ def train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_ep
 
     num_train = len(dataloaders_dict['train'])
     num_val = len(dataloaders_dict['val'])
-    print(f'LR: {optimizer.param_groups[0]["lr"]} Epochs {num_epochs} | #train{num_train} #val{num_val}')
+    print(get_time(),f'LR: {optimizer.param_groups[0]["lr"]} Epochs {num_epochs} | #train{num_train} #val{num_val}')
 
     for epoch in range(num_epochs):
         model.cuda()
@@ -359,24 +360,21 @@ def main():
     seed_everything(seed)
 
     # map size to analyse
-    map_size = 16
+    filters = 36
+    map_size = 32
+    dataset_sizes = []
+
     make_input_size = map_size
-    filters = 48
-    dataset_sizes = [12,16]
-    model = LuxNet(filt=filters); skip_first = False
-    # model = torch.jit.load('./model12_48.pth'); skip_first = True
-
-
     do_print = True
     obses, samples = create_dataset_from_json(episode_dir, set_sizes=dataset_sizes)
     if do_print:
         print('obses:', len(obses), 'samples:', len(samples))
 
     labels = [sample[-1] for sample in samples]
-    actions = ['north', 'south', 'west', 'east', 'bcity']
+    actions = ['north', 'south', 'west', 'east', 'bcity', 'transfer']
     for value, count in zip(*np.unique(labels, return_counts=True)):
         if do_print:
-            print(f'{actions[value]:^5}: {count:>3}')
+            print(f'{actions[value]:^6}: {count:>3}')
 
     train, val = train_test_split(samples, test_size=0.1, random_state=42, stratify=labels)
     batch_size = 64
@@ -395,17 +393,41 @@ def main():
     dataloaders_dict = {"train": train_loader, "val": val_loader}
     criterion = nn.CrossEntropyLoss()
 
-    # optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+    max_size_of_dataset = 32
+    if len(dataset_sizes)>0:
+        max_size_of_dataset = max (dataset_sizes)
+
+    if map_size<max_size_of_dataset:
+        print(f'map size {map_size} is set smaller than dataset size',dataset_sizes)
+        exit()
+
+        # optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
     # train_model(model, dataloaders_dict, criterion, optimizer, num_epochs=10)
     # optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
 
+    model = LuxNet(filt=filters); skip_first = False
+    #model = torch.jit.load('./model.pth'); skip_first = True
 
-    # optimizer = torch.optim.AdamW(model.parameters(), lr=1e-03)
+
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-03)
-    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=2)
-    train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs=100, map_size=map_size,
+    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=5)
+    train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs=4, map_size=map_size,
                 skip_first_train=skip_first)
 
+    optimizer = torch.optim.AdamW(model.parameters(), lr=5e-04)
+    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=5)
+    train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs=3, map_size=map_size,
+                skip_first_train=skip_first)
+
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-04)
+    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=5)
+    train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs=3, map_size=map_size,
+                skip_first_train=skip_first)
+
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-05)
+    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=5)
+    train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs=3, map_size=map_size,
+                skip_first_train=skip_first)
 
 if __name__ == '__main__':
     main()

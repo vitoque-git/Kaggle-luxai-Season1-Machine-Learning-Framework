@@ -1,4 +1,7 @@
-"# luxai-2021-ML" 
+"# luxai-2021-ML"
+
+Ivan 1430: Loss: 0.5305 | Acc: 0.7862
+
     # baselines
     # IL
     # 12 Loss: 0.5064 Acc: 0.7963
@@ -30,20 +33,26 @@
     # 48 Saved model.pth from epoch 11 as it is the most accurate so far: Loss: 0.5897 Acc: 0.7723
 
     # 12 16
-    # 48 Saved model.pth from epoch 25 as it is the most accurate so far: Loss: 0.6738 Acc: 0.7968
+    # 48 Loss: 0.6738 Acc: 0.7968
     # - 12 Loss: 0.2284 Acc: 0.9149 (232)
     # - 16 Loss: 0.2370 Acc: 0.9163 (348)
 
      24 32
     # 48 Saved model.pth from epoch 2 as it is the most accurate so far: Loss: 0.6201 Acc: 0.7472
 
-
-
     #Model 2
+
     #12
-    # 48 Saved model.pth from epoch 15 as it is the most accurate so far: Loss: 0.5747 Acc: 0.7876
+    # 48  epoch 15 Loss: 0.5747 Acc: 0.7876
+
+    # 12 16
+    # 48 Loss: 0.5435 Acc: 0.8041
 
 
+    Model 2 7905
+    Loss: 0.5199 Acc: 0.7905
+    Loss: 0.4586 Acc: 0.8182
+    Loss: 0.4606 Acc: 0.8184
 
 
 
