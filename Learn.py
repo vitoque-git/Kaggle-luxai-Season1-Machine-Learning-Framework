@@ -29,7 +29,7 @@ def seed_everything(seed_value):
         torch.backends.cudnn.benchmark = True
 
 
-def to_label(action):
+def to_label(action, units):
     strs = action.split(' ')
     unit_id = strs[1]
     if strs[0] == 'm':
@@ -37,10 +37,32 @@ def to_label(action):
     elif strs[0] == 'bcity':
         label = 4
     elif strs[0] == 't':
-        label = 5
+        from_pos = units[unit_id]
+        to_pos = units[strs[2]]
+        if from_pos[1]  - 1 == to_pos[1]:
+            label = 5 #n
+        elif from_pos[1]  + 1 == to_pos[1]:
+            label = 6 #s
+        if from_pos[0] - 1 == to_pos[0]:
+            label = 7  # w
+        elif from_pos[0] + 1 == to_pos[0]:
+            label = 8  # e
     else:
         label = None
     return unit_id, label
+
+ # def translate(self, direction, units=1) -> 'Position':
+ #        if direction == DIRECTIONS.NORTH:
+ #            return Position(self.x, self.y - units)
+ #        elif direction == DIRECTIONS.EAST:
+ #            return Position(self.x + units, self.y)
+ #        elif direction == DIRECTIONS.SOUTH:
+ #            return Position(self.x, self.y + units)
+ #        elif direction == DIRECTIONS.WEST:
+ #            return Position(self.x - units, self.y)
+ #        elif direction == DIRECTIONS.CENTER:
+ #            return Position(self.x, self.y)
+
 
 def depleted_resources(obs):
     for u in obs['updates']:
@@ -75,6 +97,7 @@ def create_dataset_from_json(episode_dir, team_name='Toad Brigade', set_sizes=[]
         for i in range(len(json_load['steps']) - 1):
             if json_load['steps'][i][index]['status'] == 'ACTIVE':
                 actions = json_load['steps'][i + 1][index]['action']
+
                 obs = json_load['steps'][i][0]['observation']
 
                 if depleted_resources(obs):
@@ -88,8 +111,19 @@ def create_dataset_from_json(episode_dir, team_name='Toad Brigade', set_sizes=[]
                 obs_id = f'{ep_id}_{i}'
                 obses[obs_id] = obs
 
+                units = {}
+                for update in obs['updates']:
+                    strs = update.split(' ')
+                    input_identifier = strs[0]
+
+                    if input_identifier == 'u':
+                        x = int(strs[4])
+                        y = int(strs[5])
+                        unit_id = strs[3]
+                        units[unit_id] = (x, y)
+
                 for action in actions:
-                    unit_id, label = to_label(action)
+                    unit_id, label = to_label(action, units)
                     if label is not None:
                         append((obs_id, unit_id, label))
 
@@ -269,7 +303,7 @@ class LuxNet(nn.Module):
         layers, filters = 12, filt
         self.conv0 = BasicConv2d(CHANNELS, filters, (3, 3), True)
         self.blocks = nn.ModuleList([BasicConv2d(filters, filters, (3, 3), True) for _ in range(layers)])
-        self.head_p = nn.Linear(filters, 6, bias=False)
+        self.head_p = nn.Linear(filters, 9, bias=False)
 
     def forward(self, x):
         h = F.relu_(self.conv0(x))
@@ -360,7 +394,7 @@ def main():
     seed_everything(seed)
 
     # map size to analyse
-    filters = 36
+    filters = 32
     map_size = 32
     dataset_sizes = []
 
@@ -371,7 +405,7 @@ def main():
         print('obses:', len(obses), 'samples:', len(samples))
 
     labels = [sample[-1] for sample in samples]
-    actions = ['north', 'south', 'west', 'east', 'bcity', 'transfer']
+    actions = ['north', 'south', 'west', 'east', 'bcity', 't_north', 't_south', 't_west', 't_east']
     for value, count in zip(*np.unique(labels, return_counts=True)):
         if do_print:
             print(f'{actions[value]:^6}: {count:>3}')
@@ -406,7 +440,7 @@ def main():
     # optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
 
     model = LuxNet(filt=filters); skip_first = False
-    #model = torch.jit.load('./model.pth'); skip_first = True
+    #model = torch.jit.load('./model4_32_7809.pth'); skip_first = False
 
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-03)
@@ -425,8 +459,8 @@ def main():
                 skip_first_train=skip_first)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-05)
-    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=5)
-    train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs=3, map_size=map_size,
+    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=2)
+    train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs=20, map_size=map_size,
                 skip_first_train=skip_first)
 
 if __name__ == '__main__':
