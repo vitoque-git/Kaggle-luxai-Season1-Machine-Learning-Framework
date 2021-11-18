@@ -395,8 +395,8 @@ def main():
 
     # map size to analyse
     filters = 32
-    map_size = 32
-    dataset_sizes = []
+    map_size = 16
+    dataset_sizes = [12,16]
 
     make_input_size = map_size
     do_print = True
@@ -455,6 +455,11 @@ def main():
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-04)
     scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=5)
+    train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs=3, map_size=map_size,
+                skip_first_train=skip_first)
+
+    optimizer = torch.optim.AdamW(model.parameters(), lr=5e-05)
+    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=2)
     train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs=3, map_size=map_size,
                 skip_first_train=skip_first)
 
