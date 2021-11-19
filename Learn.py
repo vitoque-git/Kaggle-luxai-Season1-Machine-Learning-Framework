@@ -1,3 +1,5 @@
+import traceback
+
 import numpy as np
 import json
 from pathlib import Path
@@ -12,8 +14,7 @@ from tqdm.auto import tqdm
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from sklearn.model_selection import train_test_split
 
-# episode_dir = '../input/lux-ai-episodes-score1800'
-episode_dir = 'C:/git/luxai/episodes/archive'
+
 
 
 def seed_everything(seed_value):
@@ -33,35 +34,32 @@ def to_label(action, units):
     strs = action.split(' ')
     unit_id = strs[1]
     if strs[0] == 'm':
-        label = {'c': None, 'n': 0, 's': 1, 'w': 2, 'e': 3}[strs[2]]
+        label = {'c': 9, 'n': 0, 's': 1, 'w': 2, 'e': 3}[strs[2]]
     elif strs[0] == 'bcity':
         label = 4
     elif strs[0] == 't':
         from_pos = units[unit_id]
-        to_pos = units[strs[2]]
-        if from_pos[1]  - 1 == to_pos[1]:
-            label = 5 #n
-        elif from_pos[1]  + 1 == to_pos[1]:
-            label = 6 #s
-        if from_pos[0] - 1 == to_pos[0]:
-            label = 7  # w
-        elif from_pos[0] + 1 == to_pos[0]:
-            label = 8  # e
+        if strs[2] in units:
+            to_pos = units[strs[2]]
+            if from_pos[1]  - 1 == to_pos[1]:
+                label = 5 #n
+            elif from_pos[1]  + 1 == to_pos[1]:
+                label = 6 #s
+            if from_pos[0] - 1 == to_pos[0]:
+                label = 7  # w
+            elif from_pos[0] + 1 == to_pos[0]:
+                label = 8  # e
+        else:
+            label = None
+    elif strs[0] == 'p':
+        #pillage
+        label = None
     else:
+        if strs[0] not in ['r','bw','bc']:
+            print("Unexpected no acton from",strs)
         label = None
     return unit_id, label
 
- # def translate(self, direction, units=1) -> 'Position':
- #        if direction == DIRECTIONS.NORTH:
- #            return Position(self.x, self.y - units)
- #        elif direction == DIRECTIONS.EAST:
- #            return Position(self.x + units, self.y)
- #        elif direction == DIRECTIONS.SOUTH:
- #            return Position(self.x, self.y + units)
- #        elif direction == DIRECTIONS.WEST:
- #            return Position(self.x - units, self.y)
- #        elif direction == DIRECTIONS.CENTER:
- #            return Position(self.x, self.y)
 
 
 def depleted_resources(obs):
@@ -78,6 +76,9 @@ def create_dataset_from_json(episode_dir, team_name='Toad Brigade', set_sizes=[]
     episodes = [path for path in Path(episode_dir).glob('*.json') if
                 ('output' not in path.name and '_info' not in path.name)]
 
+    num_actions=0
+    num_non_actions=0
+    num_cannot_work = 0
     print('create_dataset_from_json')
     for filepath in episodes:
 
@@ -100,6 +101,7 @@ def create_dataset_from_json(episode_dir, team_name='Toad Brigade', set_sizes=[]
 
                 obs = json_load['steps'][i][0]['observation']
 
+                #do not add samples in which there are no resources, because they have no value for training (noise)
                 if depleted_resources(obs):
                     break
 
@@ -112,6 +114,7 @@ def create_dataset_from_json(episode_dir, team_name='Toad Brigade', set_sizes=[]
                 obses[obs_id] = obs
 
                 units = {}
+                unit_can_work = []
                 for update in obs['updates']:
                     strs = update.split(' ')
                     input_identifier = strs[0]
@@ -119,14 +122,42 @@ def create_dataset_from_json(episode_dir, team_name='Toad Brigade', set_sizes=[]
                     if input_identifier == 'u':
                         x = int(strs[4])
                         y = int(strs[5])
-                        unit_id = strs[3]
-                        units[unit_id] = (x, y)
+                        tyep = int(strs[1])
+                        team = int(strs[2])
+                        if team == index:
+                            #our unit!
+                            unit_id = strs[3]
 
+                            if type == 1:
+                                print('turn',obs['step'], unit_id , 'is a cart...')
+
+
+                            units[unit_id] = (x, y)
+                            cooldown = float(strs[6])
+                            if cooldown == 0:
+                                unit_can_work.append(unit_id)
+                            else:
+                                num_cannot_work += 1
+
+                unit_that_worked = []
                 for action in actions:
                     unit_id, label = to_label(action, units)
+                    unit_that_worked.append(unit_id) # if we move this below "if label", then we consider pillage a stay
                     if label is not None:
+                        num_actions += 1
                         append((obs_id, unit_id, label))
 
+                #those units could have worked but it didn't, it is an important to record those
+                lazy_units = [u for u in unit_can_work if u not in unit_that_worked]
+                # if obs['step'] <=4:
+                #     print('turn',obs['step'],len(unit_can_work), '-', len(unit_that_worked),'=',len(lazy_units))
+                #     print('turn', obs['step'], unit_can_work, '-', unit_that_worked, '=', lazy_units)
+                for unit_id in lazy_units:
+                    num_non_actions += 1
+                    append((obs_id, unit_id, 9))
+
+
+    print("non_actions",num_non_actions,";actions",num_actions,";cannotwork",num_cannot_work)
     return obses, samples
 
 CHANNELS = 25
@@ -136,6 +167,21 @@ def make_input(obs, unit_id, size=32):
     width, height = obs['width'], obs['height']
     x_shift = (size - width) // 2
     y_shift = (size - height) // 2
+
+    check_invalid = False
+    if width > size:
+        # need to shift to get the main unit inside
+        check_invalid = True
+        for update in obs['updates']:
+            strs = update.split(' ')
+            if strs[0] == 'u' and unit_id == strs[3]:
+                unit_x = int(strs[4])
+                unit_y = int(strs[5])
+                x_shift = get_shift_when_map_bigger_array(size, unit_x, width, x_shift)
+                y_shift = get_shift_when_map_bigger_array(size, unit_y, height, y_shift)
+
+                break
+
     cities = {}
 
     turn = obs['step']
@@ -161,6 +207,7 @@ def make_input(obs, unit_id, size=32):
     b = np.zeros((CHANNELS, size, size), dtype=np.float32)
 
     for update in obs['updates']:
+
         strs = update.split(' ')
         input_identifier = strs[0]
 
@@ -172,6 +219,10 @@ def make_input(obs, unit_id, size=32):
             uranium = int(strs[9])
             fuel = wood + coal * 10 + uranium * 40
             if unit_id == strs[3]:
+                # Main Unit
+                if invalid_size(x, y, size):
+                    print(f'WARN invalid xy', unit_id,x,y,'orig',strs[4],strs[5],'shift',x_shift, y_shift)
+                    exit()
                 # Position and Cargo
                 b[:3, x, y] = (
                     1,
@@ -179,10 +230,14 @@ def make_input(obs, unit_id, size=32):
                     fuel / 4000
                 )
             else:
-                # Units
+                # Other Units
                 team = int(strs[2])
                 cooldown = float(strs[6])
                 idx = 3 + (team - obs['player']) % 2 * 3
+                if check_invalid:
+                    if invalid_size(x, y, size):
+                        continue
+
                 b[idx:idx + 3, x, y] = (
                     1,
                     cooldown / 6,
@@ -195,6 +250,9 @@ def make_input(obs, unit_id, size=32):
             x = int(strs[3]) + x_shift
             y = int(strs[4]) + y_shift
             idx = 9 + (team - obs['player']) % 2 * 4
+            if check_invalid:
+                if invalid_size(x, y, size):
+                    continue
             b[idx:idx + 4, x, y] = (
                 1,
                 cities[city_id][0],
@@ -206,6 +264,9 @@ def make_input(obs, unit_id, size=32):
             r_type = strs[1]
             x = int(strs[2]) + x_shift
             y = int(strs[3]) + y_shift
+            if check_invalid:
+                if invalid_size(x, y, size):
+                    continue
             amt = int(float(strs[4]))
             b[{'wood': 17, 'coal': 18, 'uranium': 19}[r_type], x, y] = amt / 800
         elif input_identifier == 'rp':
@@ -235,6 +296,25 @@ def make_input(obs, unit_id, size=32):
 
     return b
 
+
+def get_shift_when_map_bigger_array(size_array, unit_coordinate, size_map, shift):
+    if unit_coordinate - (size_array // 2) <= 0:
+        shift = 0
+    elif unit_coordinate - (size_map // 2) <= 0:
+        shift = (size_array // 2) - unit_coordinate
+    elif unit_coordinate + (size_array // 2) > size_map:
+        shift = size_array - size_map
+    elif unit_coordinate + (size_map // 2) >= size_map:
+        shift = (size_array // 2) - unit_coordinate + 1
+
+    # print("XY5", unit_coordinate, shift)
+
+    return shift
+
+
+
+def invalid_size(x,y,size):
+    return (x>=size) or (y>=size) or (x<0) or (y<0)
 
 class LuxDataset(Dataset):
     def __init__(self, obses, samples, make_input_size=32):
@@ -303,7 +383,7 @@ class LuxNet(nn.Module):
         layers, filters = 12, filt
         self.conv0 = BasicConv2d(CHANNELS, filters, (3, 3), True)
         self.blocks = nn.ModuleList([BasicConv2d(filters, filters, (3, 3), True) for _ in range(layers)])
-        self.head_p = nn.Linear(filters, 9, bias=False)
+        self.head_p = nn.Linear(filters, len(actions), bias=False)
 
     def forward(self, x):
         h = F.relu_(self.conv0(x))
@@ -383,20 +463,27 @@ def train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_ep
             best_acc = epoch_acc
 
         traced = torch.jit.trace(model.cpu(), torch.rand(1, CHANNELS, map_size, map_size))
-        traced.save(f'model_{epoch + 1}.pth')
+        suffix = datetime.now().strftime('%H%M')
+        traced.save(f'model_{epoch + 1}_{suffix}.pth')
 
         scheduler.step(epoch_loss)
 
 
+actions = ['north', 'south', 'west', 'east', 'bcity', 't_north', 't_south', 't_west', 't_east', 'stay']
+
+# episode_dir = '../input/lux-ai-episodes-score1800'
+episode_dir = 'C:/git/luxai/episodes/all'
+#episode_dir = 'C:/git/luxai/episodes/23692494'
+
 def main():
-    print('Start!')
+    print('Start!', datetime.now().strftime('%H:%M'))
     seed = 42
     seed_everything(seed)
 
     # map size to analyse
-    filters = 32
-    map_size = 16
-    dataset_sizes = [12,16]
+    filters = 36
+    map_size = 32
+    dataset_sizes = []
 
     make_input_size = map_size
     do_print = True
@@ -405,7 +492,6 @@ def main():
         print('obses:', len(obses), 'samples:', len(samples))
 
     labels = [sample[-1] for sample in samples]
-    actions = ['north', 'south', 'west', 'east', 'bcity', 't_north', 't_south', 't_west', 't_east']
     for value, count in zip(*np.unique(labels, return_counts=True)):
         if do_print:
             print(f'{actions[value]:^6}: {count:>3}')
@@ -432,41 +518,35 @@ def main():
         max_size_of_dataset = max (dataset_sizes)
 
     if map_size<max_size_of_dataset:
-        print(f'map size {map_size} is set smaller than dataset size',dataset_sizes)
-        exit()
+        print(f'WARN map size {map_size} is set smaller than dataset size',dataset_sizes)
+        # exit()
 
         # optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
     # train_model(model, dataloaders_dict, criterion, optimizer, num_epochs=10)
     # optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
 
-    model = LuxNet(filt=filters); skip_first = False
-    #model = torch.jit.load('./model4_32_7809.pth'); skip_first = False
+    print(episode_dir)
+
+    model = LuxNet(filt=filters); print('Starting new model filters=',filters); skip_first = False
+    #model_path='./model_7983.pth'; model = torch.jit.load(model_path); print('Loading',model_path);skip_first = True
+
+    do_train(criterion, dataloaders_dict, map_size, model, num_epochs=4, lr=1e-03)
+    do_train(criterion, dataloaders_dict, map_size, model, num_epochs=3, lr=5e-04)
+    do_train(criterion, dataloaders_dict, map_size, model, num_epochs=3, lr=1e-04)
+    do_train(criterion, dataloaders_dict, map_size, model, num_epochs=3, lr=5e-05)
+    do_train(criterion, dataloaders_dict, map_size, model, num_epochs=5, lr=1e-05)
 
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-03)
-    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=5)
-    train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs=4, map_size=map_size,
+
+def do_train(criterion, dataloaders_dict, map_size, model, num_epochs, lr,
+             scheduler_factor=.5, scheduler_patience=-1, skip_first=False):
+    if scheduler_patience == -1:
+        scheduler_patience = num_epochs
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=scheduler_factor, patience=scheduler_patience)
+    train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs=num_epochs, map_size=map_size,
                 skip_first_train=skip_first)
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=5e-04)
-    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=5)
-    train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs=3, map_size=map_size,
-                skip_first_train=skip_first)
-
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-04)
-    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=5)
-    train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs=3, map_size=map_size,
-                skip_first_train=skip_first)
-
-    optimizer = torch.optim.AdamW(model.parameters(), lr=5e-05)
-    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=2)
-    train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs=3, map_size=map_size,
-                skip_first_train=skip_first)
-
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-05)
-    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=2)
-    train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs=20, map_size=map_size,
-                skip_first_train=skip_first)
 
 if __name__ == '__main__':
     main()
