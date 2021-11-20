@@ -402,14 +402,20 @@ def get_time():
 
     return now.strftime("%H:%M:%S")
 
-
+number_train_cycle = 0
 def train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs, map_size=32,
                 skip_first_train=True):
+    global number_train_cycle
+    try:
+        number_train_cycle += 1
+    except NameError:
+        number_train_cycle = 1
+
     best_acc = 0.0
 
     num_train = len(dataloaders_dict['train'])
     num_val = len(dataloaders_dict['val'])
-    print(get_time(),f'LR: {optimizer.param_groups[0]["lr"]} Epochs {num_epochs} | #train{num_train} #val{num_val}')
+    print(get_time(),f' {number_train_cycle} LR: {optimizer.param_groups[0]["lr"]} Epochs {num_epochs} | #train{num_train} #val{num_val}')
 
     for epoch in range(num_epochs):
         model.cuda()
@@ -464,7 +470,7 @@ def train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_ep
 
         traced = torch.jit.trace(model.cpu(), torch.rand(1, CHANNELS, map_size, map_size))
         suffix = datetime.now().strftime('%H%M')
-        traced.save(f'model_{epoch + 1}_{suffix}.pth')
+        traced.save(f'model_{number_train_cycle}_{epoch + 1}_{suffix}.pth')
 
         scheduler.step(epoch_loss)
 
