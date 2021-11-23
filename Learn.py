@@ -69,19 +69,20 @@ def depleted_resources(obs):
     return True
 
 
-def create_dataset_from_json(episode_dir, team_name='Toad Brigade', set_sizes=[]):
-    obses = {}
-    samples = []
-    append = samples.append
+def create_dataset_from_json(episode_dir, team_name='Toad Brigade', set_sizes=[], exclude_turns_on_after=350):
+    samples = {}
+    num_samples = 0
+
     episodes = [path for path in Path(episode_dir).glob('*.json') if
                 ('output' not in path.name and '_info' not in path.name)]
 
     num_actions=0
     num_non_actions=0
     num_cannot_work = 0
-    print('create_dataset_from_json')
+    print('create_dataset_from_json:', episode_dir)
     for filepath in episodes:
-
+        episode_samples = []
+        episode_obses = {}
         with open(filepath) as f:
             json_load = json.load(f)
 
@@ -101,6 +102,10 @@ def create_dataset_from_json(episode_dir, team_name='Toad Brigade', set_sizes=[]
 
                 obs = json_load['steps'][i][0]['observation']
 
+                # do not add samples after the cutoff turn. For example 350 if we do not want the last night
+                if i >= exclude_turns_on_after:
+                    break
+
                 #do not add samples in which there are no resources, because they have no value for training (noise)
                 if depleted_resources(obs):
                     break
@@ -111,7 +116,7 @@ def create_dataset_from_json(episode_dir, team_name='Toad Brigade', set_sizes=[]
                     if k in ['step', 'updates', 'player', 'width', 'height']
                 ])
                 obs_id = f'{ep_id}_{i}'
-                obses[obs_id] = obs
+                episode_obses[obs_id] = obs
 
                 units = {}
                 unit_can_work = []
@@ -139,13 +144,14 @@ def create_dataset_from_json(episode_dir, team_name='Toad Brigade', set_sizes=[]
                             else:
                                 num_cannot_work += 1
 
+
                 unit_that_worked = []
                 for action in actions:
                     unit_id, label = to_label(action, units)
                     unit_that_worked.append(unit_id) # if we move this below "if label", then we consider pillage a stay
                     if label is not None:
                         num_actions += 1
-                        append((obs_id, unit_id, label))
+                        episode_samples.append((obs_id, unit_id, label))
 
                 #those units could have worked but it didn't, it is an important to record those
                 lazy_units = [u for u in unit_can_work if u not in unit_that_worked]
@@ -154,11 +160,13 @@ def create_dataset_from_json(episode_dir, team_name='Toad Brigade', set_sizes=[]
                 #     print('turn', obs['step'], unit_can_work, '-', unit_that_worked, '=', lazy_units)
                 for unit_id in lazy_units:
                     num_non_actions += 1
-                    append((obs_id, unit_id, 9))
+                    episode_samples.append((obs_id, unit_id, 9))
 
+        samples[ep_id] = (episode_obses, episode_samples)
+        num_samples += len(episode_samples)
 
     print("non_actions",num_non_actions,";actions",num_actions,";cannotwork",num_cannot_work)
-    return obses, samples
+    return samples, num_samples
 
 CHANNELS = 25
 
@@ -475,6 +483,35 @@ def train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_ep
         scheduler.step(epoch_loss)
 
 
+def my_train_test_split(samples, divide_by):
+    loop_counter = 0
+    obses_train, obses_eval = ({}, {})
+    samples_train, samples_eval = ([], [])
+    for obs, sample in samples.values():
+        loop_counter += 1
+        if loop_counter == divide_by:
+            # 1/divide_by of samples go to eval
+            obses_eval.update(obs)
+            samples_eval.extend(sample)
+            loop_counter = 0
+        else:
+            # rest go to train
+            obses_train.update(obs)
+            samples_train.extend(sample)
+    return obses_eval, obses_train, samples_eval, samples_train
+
+
+def do_train(criterion, dataloaders_dict, map_size, model, num_epochs, lr,
+             scheduler_factor=.5, scheduler_patience=-1, skip_first=False):
+    if scheduler_patience == -1:
+        scheduler_patience = num_epochs
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=scheduler_factor, patience=scheduler_patience)
+    train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs=num_epochs, map_size=map_size,
+                skip_first_train=skip_first)
+
+
+
 actions = ['north', 'south', 'west', 'east', 'bcity', 't_north', 't_south', 't_west', 't_east', 'stay']
 
 # episode_dir = '../input/lux-ai-episodes-score1800'
@@ -492,26 +529,36 @@ def main():
     dataset_sizes = []
 
     make_input_size = map_size
-    do_print = True
-    obses, samples = create_dataset_from_json(episode_dir, set_sizes=dataset_sizes)
-    if do_print:
-        print('obses:', len(obses), 'samples:', len(samples))
+    samples, num_samples = create_dataset_from_json(episode_dir, set_sizes=dataset_sizes)
+    print('episodes:', len(samples), 'samples:', num_samples)
 
-    labels = [sample[-1] for sample in samples]
-    for value, count in zip(*np.unique(labels, return_counts=True)):
-        if do_print:
-            print(f'{actions[value]:^6}: {count:>3}')
+    #poor man split of data, based on episodees to avoid inter-episode contamination
+    obses_eval, obses_train, samples_eval, samples_train = my_train_test_split(samples, divide_by=11)
 
-    train, val = train_test_split(samples, test_size=0.1, random_state=42, stratify=labels)
+    print('Train observations:', len(obses_train), 'samples:', len(samples_train))
+    print('Eval  observations:', len(obses_eval), 'samples:', len(samples_eval))
+    print(f'Ratio  observations: {len(obses_eval) / len(obses_train) :.4f}'
+          f' samples:{len(samples_eval) / len(samples_train) :.4f}')
+
+
+    # do_print = True
+    # labels = [sample[-1] for sample in samples]
+    # for value, count in zip(*np.unique(labels, return_counts=True)):
+    #     if do_print:
+    #         print(f'{actions[value]:^6}: {count:>3}')
+    #
+    # train, val = train_test_split(samples, test_size=0.1, random_state=42, stratify=labels)
+
+
     batch_size = 64
     train_loader = DataLoader(
-        LuxDataset(obses, train, make_input_size=make_input_size),
+        LuxDataset(obses_train, samples_train, make_input_size=make_input_size),
         batch_size=batch_size,
         shuffle=True,
         num_workers=2
     )
     val_loader = DataLoader(
-        LuxDataset(obses, val, make_input_size=make_input_size),
+        LuxDataset(obses_eval, samples_eval, make_input_size=make_input_size),
         batch_size=batch_size,
         shuffle=False,
         num_workers=2
@@ -531,10 +578,8 @@ def main():
     # train_model(model, dataloaders_dict, criterion, optimizer, num_epochs=10)
     # optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
 
-    print(episode_dir)
-
     model = LuxNet(filt=filters); print('Starting new model filters=',filters); skip_first = False
-    #model_path='./model_7983.pth'; model = torch.jit.load(model_path); print('Loading',model_path);skip_first = True
+    # model_path='./model5_36_t_8417.pth'; model = torch.jit.load(model_path); print('Loading',model_path);skip_first = True
 
     do_train(criterion, dataloaders_dict, map_size, model, num_epochs=4, lr=1e-03)
     do_train(criterion, dataloaders_dict, map_size, model, num_epochs=3, lr=5e-04)
@@ -542,16 +587,10 @@ def main():
     do_train(criterion, dataloaders_dict, map_size, model, num_epochs=3, lr=5e-05)
     do_train(criterion, dataloaders_dict, map_size, model, num_epochs=5, lr=1e-05)
 
-
-
-def do_train(criterion, dataloaders_dict, map_size, model, num_epochs, lr,
-             scheduler_factor=.5, scheduler_patience=-1, skip_first=False):
-    if scheduler_patience == -1:
-        scheduler_patience = num_epochs
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
-    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=scheduler_factor, patience=scheduler_patience)
-    train_model(model, dataloaders_dict, criterion, optimizer, scheduler, num_epochs=num_epochs, map_size=map_size,
-                skip_first_train=skip_first)
+    # do_train(criterion, dataloaders_dict, map_size, model, num_epochs=3, lr=2e-05)
+    # do_train(criterion, dataloaders_dict, map_size, model, num_epochs=4, lr=1e-05)
+    # do_train(criterion, dataloaders_dict, map_size, model, num_epochs=4, lr=5e-06)
+    # do_train(criterion, dataloaders_dict, map_size, model, num_epochs=1, lr=1e-06)
 
 
 if __name__ == '__main__':
