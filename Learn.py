@@ -578,14 +578,14 @@ def main():
     # train_model(model, dataloaders_dict, criterion, optimizer, num_epochs=10)
     # optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
 
-    model = LuxNet(filt=filters); print('Starting new model filters=',filters); skip_first = False
-    # model_path='./model5_36_t_8417.pth'; model = torch.jit.load(model_path); print('Loading',model_path);skip_first = True
+    # model = LuxNet(filt=filters); print('Starting new model filters=',filters); skip_first = False
+    model_path='./model_6_7908.pth'; model = torch.jit.load(model_path); print('Loading',model_path);skip_first = True
 
-    do_train(criterion, dataloaders_dict, map_size, model, num_epochs=4, lr=1e-03)
-    do_train(criterion, dataloaders_dict, map_size, model, num_epochs=3, lr=5e-04)
-    do_train(criterion, dataloaders_dict, map_size, model, num_epochs=3, lr=1e-04)
-    do_train(criterion, dataloaders_dict, map_size, model, num_epochs=3, lr=5e-05)
-    do_train(criterion, dataloaders_dict, map_size, model, num_epochs=5, lr=1e-05)
+    # do_train(criterion, dataloaders_dict, map_size, model, num_epochs=4, lr=1e-03)
+    # do_train(criterion, dataloaders_dict, map_size, model, num_epochs=3, lr=5e-04)
+    # do_train(criterion, dataloaders_dict, map_size, model, num_epochs=3, lr=1e-04)
+    # do_train(criterion, dataloaders_dict, map_size, model, num_epochs=3, lr=5e-05)
+    do_train(criterion, dataloaders_dict, map_size, model, num_epochs=1, lr=1e-05, skip_first=skip_first)
 
     # do_train(criterion, dataloaders_dict, map_size, model, num_epochs=3, lr=2e-05)
     # do_train(criterion, dataloaders_dict, map_size, model, num_epochs=4, lr=1e-05)
