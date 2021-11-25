@@ -289,11 +289,13 @@ def make_input(obs, unit_id, size=32):
             lightupkeep = float(strs[4])
             autonomy = int(fuel) // int(lightupkeep)
             will_live = autonomy >= all_night_turns_lef
+            if will_live:
+                excess_fuel = (1 + int(fuel) - (int(lightupkeep) * all_night_turns_lef)) / 4000
             will_live_next_night = autonomy >= next_night_number_turn
             cities[city_id] = (
                 int(will_live_next_night),
-                int(will_live),
-                min(autonomy, 10) / 10)
+                excess_fuel,
+                turns_it_will_live(autonomy, steps_until_night) / 360)
 
     # Day/Night Cycle
     b[22, :] = obs['step'] % 40 / 40
@@ -304,6 +306,19 @@ def make_input(obs, unit_id, size=32):
 
     return b
 
+def turns_it_will_live(autonomy, steps_until_night,_next_night_number_turn=-1) ->int:
+    autonomy=max(0,autonomy)
+    if _next_night_number_turn == -1:
+        next_night_number_turn = min(10, 10 + steps_until_night)
+    else:
+        next_night_number_turn = _next_night_number_turn
+
+    turn_to_night= max(0,steps_until_night)
+    # print('turn_to_night',turn_to_night, 'next_night_number_turn',next_night_number_turn, 'aut',autonomy)
+    if autonomy>=next_night_number_turn:
+       return turns_it_will_live(autonomy-next_night_number_turn,turn_to_night+40,10)
+    else:
+       return autonomy + turn_to_night
 
 def get_shift_when_map_bigger_array(size_array, unit_coordinate, size_map, shift):
     if unit_coordinate - (size_array // 2) <= 0:
