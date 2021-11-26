@@ -1,0 +1,60 @@
+C:\Python39\python.exe C:/git/luxai/ml/Learn.py
+Start! 09:27
+create_dataset_from_json: C:/git/luxai/episodes/all
+non_actions 2976378 ;actions 2038845 ;cannotwork 1569617
+episodes: 811 samples: 5015223
+Train observations: 241319 samples: 4607111
+Eval  observations: 23460 samples: 408112
+Ratio  observations: 0.0972 samples:0.0886
+Starting new model filters= 36
+09:28:04  1 LR: 0.001 Epochs 4 | #train71987 #val6377
+10:42:17 LR: 0.001 Epoch 1/4 | train | Loss: 0.6830 | Acc: 0.7509
+10:45:02 LR: 0.001 Epoch 1/4 |  val  | Loss: 0.6663 | Acc: 0.7518
+Saved model.pth from epoch 1 as it is the most accurate so far: Loss: 0.6663 Acc: 0.7518
+11:58:26 LR: 0.001 Epoch 2/4 | train | Loss: 0.5947 | Acc: 0.7805
+12:01:11 LR: 0.001 Epoch 2/4 |  val  | Loss: 0.6418 | Acc: 0.7630
+Saved model.pth from epoch 2 as it is the most accurate so far: Loss: 0.6418 Acc: 0.7630
+13:14:27 LR: 0.001 Epoch 3/4 | train | Loss: 0.5720 | Acc: 0.7882
+13:17:11 LR: 0.001 Epoch 3/4 |  val  | Loss: 0.6314 | Acc: 0.7648
+Saved model.pth from epoch 3 as it is the most accurate so far: Loss: 0.6314 Acc: 0.7648
+14:30:27 LR: 0.001 Epoch 4/4 | train | Loss: 0.5591 | Acc: 0.7926
+14:33:11 LR: 0.001 Epoch 4/4 |  val  | Loss: 0.6162 | Acc: 0.7700
+Saved model.pth from epoch 4 as it is the most accurate so far: Loss: 0.6162 Acc: 0.7700
+14:33:11  2 LR: 0.0005 Epochs 3 | #train71987 #val6377
+15:46:39 LR: 0.0005 Epoch 1/3 | train | Loss: 0.5147 | Acc: 0.8085
+15:49:23 LR: 0.0005 Epoch 1/3 |  val  | Loss: 0.5860 | Acc: 0.7809
+Saved model.pth from epoch 1 as it is the most accurate so far: Loss: 0.5860 Acc: 0.7809
+17:03:02 LR: 0.0005 Epoch 2/3 | train | Loss: 0.5102 | Acc: 0.8101
+17:05:46 LR: 0.0005 Epoch 2/3 |  val  | Loss: 0.5877 | Acc: 0.7808
+18:19:11 LR: 0.0005 Epoch 3/3 | train | Loss: 0.5092 | Acc: 0.8106
+18:21:56 LR: 0.0005 Epoch 3/3 |  val  | Loss: 0.5906 | Acc: 0.7790
+18:21:56  3 LR: 0.0001 Epochs 3 | #train71987 #val6377
+19:35:27 LR: 0.0001 Epoch 1/3 | train | Loss: 0.4602 | Acc: 0.8285
+19:38:12 LR: 0.0001 Epoch 1/3 |  val  | Loss: 0.5553 | Acc: 0.7920
+Saved model.pth from epoch 1 as it is the most accurate so far: Loss: 0.5553 Acc: 0.7920
+20:51:52 LR: 0.0001 Epoch 2/3 | train | Loss: 0.4513 | Acc: 0.8318
+20:54:36 LR: 0.0001 Epoch 2/3 |  val  | Loss: 0.5563 | Acc: 0.7904
+22:08:13 LR: 0.0001 Epoch 3/3 | train | Loss: 0.4476 | Acc: 0.8332
+22:10:57 LR: 0.0001 Epoch 3/3 |  val  | Loss: 0.5574 | Acc: 0.7896
+22:10:57  4 LR: 5e-05 Epochs 3 | #train71987 #val6377
+23:24:43 LR: 5e-05 Epoch 1/3 | train | Loss: 0.4360 | Acc: 0.8376
+23:27:26 LR: 5e-05 Epoch 1/3 |  val  | Loss: 0.5540 | Acc: 0.7918
+Saved model.pth from epoch 1 as it is the most accurate so far: Loss: 0.5540 Acc: 0.7918
+00:41:24 LR: 5e-05 Epoch 2/3 | train | Loss: 0.4334 | Acc: 0.8387
+00:44:07 LR: 5e-05 Epoch 2/3 |  val  | Loss: 0.5541 | Acc: 0.7915
+01:57:59 LR: 5e-05 Epoch 3/3 | train | Loss: 0.4317 | Acc: 0.8392
+02:00:42 LR: 5e-05 Epoch 3/3 |  val  | Loss: 0.5598 | Acc: 0.7902
+02:00:43  5 LR: 1e-05 Epochs 3 | #train71987 #val6377
+03:14:34 LR: 1e-05 Epoch 1/3 | train | Loss: 0.4219 | Acc: 0.8430
+03:17:17 LR: 1e-05 Epoch 1/3 |  val  | Loss: 0.5538 | Acc: 0.7929
+Saved model.pth from epoch 1 as it is the most accurate so far: Loss: 0.5538 Acc: 0.7929
+04:30:54 LR: 1e-05 Epoch 2/3 | train | Loss: 0.4206 | Acc: 0.8435
+04:33:38 LR: 1e-05 Epoch 2/3 |  val  | Loss: 0.5545 | Acc: 0.7920
+05:47:13 LR: 1e-05 Epoch 3/3 | train | Loss: 0.4199 | Acc: 0.8437
+05:49:56 LR: 1e-05 Epoch 3/3 |  val  | Loss: 0.5567 | Acc: 0.7921
+05:49:56  6 LR: 5e-06 Epochs 1 | #train71987 #val6377
+07:03:40 LR: 5e-06 Epoch 1/1 | train | Loss: 0.4182 | Acc: 0.8444
+07:06:23 LR: 5e-06 Epoch 1/1 |  val  | Loss: 0.5568 | Acc: 0.7918
+Saved model.pth from epoch 1 as it is the most accurate so far: Loss: 0.5568 Acc: 0.7918
+
+Process finished with exit code 0
