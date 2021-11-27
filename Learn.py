@@ -289,11 +289,12 @@ def make_input(obs, unit_id, size=32):
             lightupkeep = float(strs[4])
             autonomy = int(fuel) // int(lightupkeep)
             will_live = autonomy >= all_night_turns_lef
+            excess_fuel = 0.
             if will_live:
                 excess_fuel = (1 + int(fuel) - (int(lightupkeep) * all_night_turns_lef)) / 4000
             will_live_next_night = autonomy >= next_night_number_turn
             cities[city_id] = (
-                int(will_live_next_night),
+                int(will_live),
                 excess_fuel,
                 turns_it_will_live(autonomy, steps_until_night) / 360)
 
@@ -530,7 +531,8 @@ def do_train(criterion, dataloaders_dict, map_size, model, num_epochs, lr,
 actions = ['north', 'south', 'west', 'east', 'bcity', 't_north', 't_south', 't_west', 't_east', 'stay']
 
 # episode_dir = '../input/lux-ai-episodes-score1800'
-episode_dir = 'C:/git/luxai/episodes/all'
+# episode_dir = 'C:/git/luxai/episodes/all'
+episode_dir = 'C:/git/luxai/episodes/all_26112021'
 #episode_dir = 'C:/git/luxai/episodes/23692494'
 
 def main():
@@ -548,7 +550,7 @@ def main():
     print('episodes:', len(samples), 'samples:', num_samples)
 
     #poor man split of data, based on episodees to avoid inter-episode contamination
-    obses_eval, obses_train, samples_eval, samples_train = my_train_test_split(samples, divide_by=11)
+    obses_eval, obses_train, samples_eval, samples_train = my_train_test_split(samples, divide_by=16)
 
     print('Train observations:', len(obses_train), 'samples:', len(samples_train))
     print('Eval  observations:', len(obses_eval), 'samples:', len(samples_eval))
@@ -576,7 +578,7 @@ def main():
         LuxDataset(obses_eval, samples_eval, make_input_size=make_input_size),
         batch_size=batch_size,
         shuffle=False,
-        num_workers=2
+        num_workers=4
     )
     dataloaders_dict = {"train": train_loader, "val": val_loader}
     criterion = nn.CrossEntropyLoss()
