@@ -295,12 +295,12 @@ def make_input(obs, unit_id, size=32):
             lightupkeep = float(strs[4])
             autonomy = int(fuel) // int(lightupkeep)
             will_live = autonomy >= all_night_turns_lef
-            excess_fuel = 0
+            excess_fuel = 0.
             if will_live:
                 excess_fuel = (1 + int(fuel) - (int(lightupkeep) * all_night_turns_lef)) / 4000
             will_live_next_night = autonomy >= next_night_number_turn
             cities[city_id] = (
-                int(will_live_next_night),
+                int(will_live),
                 excess_fuel,
                 turns_it_will_live(autonomy, steps_until_night) / 360)
 
@@ -581,7 +581,8 @@ def show_accuracy_by_map(map_size,model_path, batch_size = 64):
 actions = ['north', 'south', 'west', 'east', 'bcity', 't_north', 't_south', 't_west', 't_east', 'stay']
 
 # APPROACH 1, load episodes from one directory and then split
-episode_dir = 'C:/git/luxai/episodes/all'
+# episode_dir = 'C:/git/luxai/episodes/all'
+episode_dir = 'C:/git/luxai/episodes/all_26112021'
 
 # APPROACH 2, load episodes from two different directories
 episode_eval = 'C:/git/luxai/episodes/RL/work/1127_split/eval'
@@ -652,7 +653,7 @@ def main():
         LuxDataset(obses_eval, samples_eval, make_input_size=make_input_size),
         batch_size=batch_size,
         shuffle=False,
-        num_workers=2
+        num_workers=4
     )
     dataloaders_dict = {"train": train_loader, "val": val_loader}
     criterion = nn.CrossEntropyLoss()
@@ -670,7 +671,7 @@ def main():
     # optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
 
     model = LuxNet(filt=filters); print('Starting new model filters=',filters); skip_first = False
-    model_path='./model.pth'; model = torch.jit.load(model_path); print('Loading',model_path);skip_first = True
+    # model_path='./model.pth'; model = torch.jit.load(model_path); print('Loading',model_path);skip_first = True
 
     # lr = 2e-03
     # for i in range(0,18):
