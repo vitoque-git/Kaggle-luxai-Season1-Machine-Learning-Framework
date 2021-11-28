@@ -3,8 +3,8 @@ from pathlib import Path
 import os
 from shutil import copyfile, copy, copy2
 
-episode_dir = 'C:/git/luxai/episodes/RL/work/1127'
-episode_out = 'C:/git/luxai/episodes/RL/work/1127_split/'
+episode_dir = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/TB/work/1127_all'
+episode_out = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/TB/work/1127_split/'
 
 
 episode_out_eval = episode_out+'eval/'
@@ -51,7 +51,7 @@ episodes_to_exclude.extend(['30971890', '30971906', '30972204', '30972797', '309
 
 
 loop_counter = 0
-divide_by = 12
+divide_by = 10
 excluded = 0
 num_eval  = 0
 num_train  = 0

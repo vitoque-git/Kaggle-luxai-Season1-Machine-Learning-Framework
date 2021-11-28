@@ -585,11 +585,13 @@ actions = ['north', 'south', 'west', 'east', 'bcity', 't_north', 't_south', 't_w
 episode_dir = 'C:/git/luxai/episodes/all_26112021'
 
 # APPROACH 2, load episodes from two different directories
-episode_eval = 'C:/git/luxai/episodes/RL/work/1127_split/eval'
-episode_train = 'C:/git/luxai/episodes/RL/work/1127_split/train'
+team_name = 'Toad Brigade'
+episode_eval = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/TB/work/1127_eval'
+episode_train = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/TB/work/1127_train'
 
-# team_name = 'Toad Brigade'
-team_name = 'RL is all you need'
+# team_name = 'RL is all you need'
+# episode_eval = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/RL/work/1127_eval'
+# episode_train = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/RL/work/1127_train'
 
 def main():
     print('Start!', datetime.now().strftime('%H:%M'))
@@ -682,7 +684,7 @@ def main():
     do_train(criterion, dataloaders_dict, map_size, model, num_epochs=3, lr=5e-04)
     do_train(criterion, dataloaders_dict, map_size, model, num_epochs=3, lr=1e-04)
     do_train(criterion, dataloaders_dict, map_size, model, num_epochs=3, lr=5e-05)
-    do_train(criterion, dataloaders_dict, map_size, model, num_epochs=1, lr=1e-05)
+    do_train(criterion, dataloaders_dict, map_size, model, num_epochs=5, lr=1e-05)
 
     # do_train(criterion, dataloaders_dict, map_size, model, num_epochs=3, lr=2e-05)
     # do_train(criterion, dataloaders_dict, map_size, model, num_epochs=4, lr=1e-05)
