@@ -11,10 +11,7 @@ import collections
 ## You should configure these to your needs. Choose one of ...
 # 'hungry-geese', 'rock-paper-scissors', santa-2020', 'halite', 'google-football'
 COMP = 'lux-ai-2021'
-MAX_CALLS_PER_DAY = 1000 # Kaggle says don't do more than 3600 per day and 1 per second
-LOWEST_SCORE_THRESH = 1850
-
-ROOT ="../working/"
+MAX_CALLS_PER_DAY = 800 # Kaggle says don't do more than 3600 per day and 1 per second
 
 MATCH_DIR = '../working/'
 base_url = "https://www.kaggle.com/requests/EpisodeService/"
@@ -35,6 +32,7 @@ os.chdir('C:/git/luxai/episodes')
 epagents_df = pd.read_csv("./EpisodeAgents_Toad3.csv")
 
 sub_to_score_top = [23297953,23281649,23692494]
+BASE_OUTPUT_DIRECTORY = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/'
 SUFFIX_DIRECTORY = 'TB'
 
 print(f'EpisodeAgents.csv: {len(epagents_df)} rows before filtering for {sub_to_score_top}.')
@@ -56,28 +54,14 @@ episodes_df['EndTime'] = pd.to_datetime(episodes_df['EndTime'])
 epagents_df.fillna(0, inplace=True)
 epagents_df = epagents_df.sort_values(by=['Id'], ascending=False)
 
-# Get top scoring submissions# Get top scoring submissions
-# max_df = (epagents_df.sort_values(by=['EpisodeId'], ascending=False).groupby('SubmissionId').head(1).drop_duplicates().reset_index(drop=True))
-# max_df = max_df[max_df.UpdatedScore>=LOWEST_SCORE_THRESH]
-# max_df = pd.merge(left=episodes_df, right=max_df, left_on='Id', right_on='EpisodeId')
-# sub_to_score_top = pd.Series(max_df.UpdatedScore.values,index=max_df.SubmissionId).to_dict()
-# print(f'{len(sub_to_score_top)} submissions with score over {LOWEST_SCORE_THRESH}')
-#
-# print("sub_to_score_top----------------")
-# print(sub_to_score_top)
-# max_df.to_csv('max_df.csv')
-#
-
-
 
 # Get episodes for these submissions
 print('Get episodes for these submissions')
 sub_to_episodes = collections.defaultdict(list)
 for key in sub_to_score_top:
-    excl = []
-    if key not in excl: # we can filter subs like this
-        eps = sorted(epagents_df[epagents_df['SubmissionId'].isin([key])]['EpisodeId'].values,reverse=True)
-        sub_to_episodes[key] = eps
+    eps = sorted(epagents_df[epagents_df['SubmissionId'].isin([key])]['EpisodeId'].values, reverse=True)
+    sub_to_episodes[key] = eps
+
 candidates = len(set([item for sublist in sub_to_episodes.values() for item in sublist]))
 print(f'{candidates} episodes for these {len(sub_to_score_top)} submissions')
 
@@ -150,7 +134,7 @@ def saveEpisode(directory,epid) -> bool:
     return True
 
 def get_path(directory,epid):
-    return './{}/{}.json'.format(directory,epid)
+    return '{}/{}.json'.format(directory,epid)
 
 r = BUFFER;
 
@@ -164,7 +148,7 @@ for key in sub_to_score_top:
             f'submission={key}, matches={len(set(sub_to_episodes[key]))}, still to save={len(remaining)}')
 
         for epid in remaining:
-            directory = SUFFIX_DIRECTORY + '/' + str(key)
+            directory = BASE_OUTPUT_DIRECTORY + SUFFIX_DIRECTORY + '/' + str(key)
             if epid not in seen_episodes and num_api_calls_today <= MAX_CALLS_PER_DAY:
                 if not saveEpisode(directory,epid):
                     continue # file already existed, we have not used our API call, we do not need to check, next
