@@ -11,10 +11,7 @@ import collections
 ## You should configure these to your needs. Choose one of ...
 # 'hungry-geese', 'rock-paper-scissors', santa-2020', 'halite', 'google-football'
 COMP = 'lux-ai-2021'
-MAX_CALLS_PER_DAY = 1000 # Kaggle says don't do more than 3600 per day and 1 per second
-LOWEST_SCORE_THRESH = 1850
-
-ROOT ="../working/"
+MAX_CALLS_PER_DAY = 800 # Kaggle says don't do more than 3600 per day and 1 per second
 
 MATCH_DIR = '../working/'
 base_url = "https://www.kaggle.com/requests/EpisodeService/"
@@ -31,9 +28,12 @@ COMPETITIONS = {
 
 # RELOAD
 
-epagents_df = pd.read_csv("./EpisodeAgents_Toad3.csv")
+os.chdir('C:/git/luxai/episodes')
+epagents_df = pd.read_csv("./EpisodeAgents_RL.csv")
 
-sub_to_score_top = [23297953,23281649,23692494]
+sub_to_score_top = [23825143,23825329,23825266,23825370,23825224,23770016,23769678,23770123]
+BASE_OUTPUT_DIRECTORY = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/'
+SUFFIX_DIRECTORY = 'RL'
 
 print(f'EpisodeAgents.csv: {len(epagents_df)} rows before filtering for {sub_to_score_top}.')
 epagents_df = epagents_df[epagents_df.SubmissionId.isin(sub_to_score_top)]
@@ -54,28 +54,14 @@ episodes_df['EndTime'] = pd.to_datetime(episodes_df['EndTime'])
 epagents_df.fillna(0, inplace=True)
 epagents_df = epagents_df.sort_values(by=['Id'], ascending=False)
 
-# Get top scoring submissions# Get top scoring submissions
-# max_df = (epagents_df.sort_values(by=['EpisodeId'], ascending=False).groupby('SubmissionId').head(1).drop_duplicates().reset_index(drop=True))
-# max_df = max_df[max_df.UpdatedScore>=LOWEST_SCORE_THRESH]
-# max_df = pd.merge(left=episodes_df, right=max_df, left_on='Id', right_on='EpisodeId')
-# sub_to_score_top = pd.Series(max_df.UpdatedScore.values,index=max_df.SubmissionId).to_dict()
-# print(f'{len(sub_to_score_top)} submissions with score over {LOWEST_SCORE_THRESH}')
-#
-# print("sub_to_score_top----------------")
-# print(sub_to_score_top)
-# max_df.to_csv('max_df.csv')
-#
-
-
 
 # Get episodes for these submissions
 print('Get episodes for these submissions')
 sub_to_episodes = collections.defaultdict(list)
 for key in sub_to_score_top:
-    excl = []
-    if key not in excl: # we can filter subs like this
-        eps = sorted(epagents_df[epagents_df['SubmissionId'].isin([key])]['EpisodeId'].values,reverse=True)
-        sub_to_episodes[key] = eps
+    eps = sorted(epagents_df[epagents_df['SubmissionId'].isin([key])]['EpisodeId'].values, reverse=True)
+    sub_to_episodes[key] = eps
+
 candidates = len(set([item for sublist in sub_to_episodes.values() for item in sublist]))
 print(f'{candidates} episodes for these {len(sub_to_score_top)} submissions')
 
@@ -144,11 +130,10 @@ def saveEpisode(directory,epid) -> bool:
     # info = create_info_json(epid)
     # with open(MATCH_DIR + '{}_info.json'.format(epid), 'w') as f:
     #     json.dump(info, f)
-
     return True
 
 def get_path(directory,epid):
-    return './{}/{}.json'.format(directory,epid)
+    return '{}/{}.json'.format(directory,epid)
 
 r = BUFFER;
 
@@ -162,18 +147,19 @@ for key in sub_to_score_top:
             f'submission={key}, matches={len(set(sub_to_episodes[key]))}, still to save={len(remaining)}')
 
         for epid in remaining:
+            directory = BASE_OUTPUT_DIRECTORY + SUFFIX_DIRECTORY + '/' + str(key)
             if epid not in seen_episodes and num_api_calls_today <= MAX_CALLS_PER_DAY:
-                if not saveEpisode(key,epid):
+                if not saveEpisode(directory,epid):
                     continue # file already existed, we have not used our API call, we do not need to check, next
-                r += 1;
+                r += 1
                 se += 1
                 try:
-                    size = os.path.getsize(get_path(key,epid)) / 1e6
+                    size = os.path.getsize(get_path(directory,epid)) / 1e6
                     print(str(num_api_calls_today) + f': saved episode #{epid}')
                     seen_episodes.append(epid)
                     num_api_calls_today += 1
                 except:
-                    print('  file {}.json did not seem to save'.format(epid))
+                    print('  file {}.json did not seem to save'.format(epid),':', get_path(directory,epid))
                 if r > (datetime.datetime.now() - start_time).seconds:
                     time.sleep(r - (datetime.datetime.now() - start_time).seconds)
             if num_api_calls_today > (min(3600, MAX_CALLS_PER_DAY)):
