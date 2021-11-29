@@ -573,6 +573,7 @@ def show_accuracy_by_map(map_size,model_path, input_sizes, batch_size = 64):
         results[str(dataset_sizes)] = show_eval(dataloaders_dict, map_size, model)
 
     print('------------------------------------------------------------')
+    print(model_path)
     for r in results.items():
         epoch_loss = r[1][0]
         epoch_acc = r[1][1]
@@ -604,8 +605,8 @@ actions = ['north', 'south', 'west', 'east', 'bcity', 't_north', 't_south', 't_w
 
 # APPROACH 2, load episodes from two different directories
 team_name = 'Toad Brigade'
-episode_eval = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/TB/work/1127_eval' # DO NOT CHANGE!!!!!!!
-# episode_eval = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/TB/work/1129_eval'
+# episode_eval = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/TB/work/1127_eval' # DO NOT CHANGE!!!!!!!
+episode_eval = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/TB/work/1129_eval'
 episode_train = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/TB/work/1129_train'
 
 # team_name = 'RL is all you need'
@@ -627,9 +628,11 @@ def main():
 
     # # show performance
     #
-    # # show_accuracy_by_map(map_size=map_size, model_path='./model.pth', input_sizes=[[12],[16],[24],[32],[]])
-    # show_accuracy_by_map(map_size=map_size, model_path='./model.pth', input_sizes=[[12],[16],[12,16]])
-    # exit()
+    model_path = './model.pth'
+    model_path = 'C:/Users/vito/Dropbox/Exchange/luxai/models/TB/model8/t1127_0/model_t8_36_1127_8136.pth'
+    show_accuracy_by_map(map_size=map_size, model_path=model_path, input_sizes=[[12],[16],[24],[32],[]])
+    # show_accuracy_by_map(map_size=map_size, model_path=model_path, input_sizes=[[12],[16],[12,16]])
+    exit()
 
     # APPROACH 1, load episodes from one directory and then split
     # samples, num_samples = create_dataset_from_json(episode_dir, team_name=team_name, set_sizes=dataset_sizes)
