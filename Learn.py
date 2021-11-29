@@ -554,10 +554,11 @@ def show_eval(dataloaders_dict, map_size, model):
                 skip_first_train=True, Save=False)
 
 
-def show_accuracy_by_map(map_size,model_path, batch_size = 64):
+def show_accuracy_by_map(map_size,model_path, input_sizes, batch_size = 64):
+
     model = torch.jit.load(model_path);
     results = {}
-    for dataset_sizes in [[12],[16],[24],[32],[]]:
+    for dataset_sizes in input_sizes:
         print("Loading with mapsize(s)=",dataset_sizes)
         ep_samples_eval, num_samples_eval = create_dataset_from_json(episode_eval, team_name=team_name,set_sizes=dataset_sizes)
         obses_eval, samples_eval  = samples_to_obs_sample_list(ep_samples_eval)
@@ -578,16 +579,34 @@ def show_accuracy_by_map(map_size,model_path, batch_size = 64):
         print(r[0],':',f'Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
 
 
+def check_data_leakage(episode_dir1, episode_dir2):
+    episodes1 = [path.stem for path in Path(episode_dir1).glob('*.json') if
+                ('output' not in path.name and '_info' not in path.name)]
+    episodes2 = [path.stem for path in Path(episode_dir2).glob('*.json') if
+                 ('output' not in path.name and '_info' not in path.name)]
+    leakage = set(episodes1) & set(episodes2)
+    if len(leakage)>0:
+        print("Leakage between eval and train:", len(leakage))
+        print(episode_dir1, len(episodes1))
+        print(episode_dir2, len(episodes2))
+        print(leakage)
+        exit()
+    else:
+        print("No leakage")
+
+
+
 actions = ['north', 'south', 'west', 'east', 'bcity', 't_north', 't_south', 't_west', 't_east', 'stay']
 
 # APPROACH 1, load episodes from one directory and then split
 # episode_dir = 'C:/git/luxai/episodes/all'
-episode_dir = 'C:/git/luxai/episodes/all_26112021'
+# episode_dir = 'C:/git/luxai/episodes/all_26112021'
 
 # APPROACH 2, load episodes from two different directories
 team_name = 'Toad Brigade'
-episode_eval = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/TB/work/1127_eval'
-episode_train = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/TB/work/1127_train'
+episode_eval = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/TB/work/1127_eval' # DO NOT CHANGE!!!!!!!
+# episode_eval = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/TB/work/1129_eval'
+episode_train = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/TB/work/1129_train'
 
 # team_name = 'RL is all you need'
 # episode_eval = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/RL/work/1127_eval'
@@ -606,8 +625,10 @@ def main():
 
     make_input_size = map_size
 
-    # show performance
-    # show_accuracy_by_map(map_size=map_size, model_path='./model.pth')
+    # # show performance
+    #
+    # # show_accuracy_by_map(map_size=map_size, model_path='./model.pth', input_sizes=[[12],[16],[24],[32],[]])
+    # show_accuracy_by_map(map_size=map_size, model_path='./model.pth', input_sizes=[[12],[16],[12,16]])
     # exit()
 
     # APPROACH 1, load episodes from one directory and then split
@@ -619,6 +640,7 @@ def main():
     # obses_eval, obses_train, samples_eval, samples_train = my_train_test_split(samples, divide_by=11)
 
     # APPROACH 2, load episodes from two different directories
+    check_data_leakage(episode_eval,episode_train)
     ep_samples_eval, num_samples_eval = create_dataset_from_json(episode_eval, team_name=team_name,set_sizes=dataset_sizes)
     ep_samples_train, num_samples_train = create_dataset_from_json(episode_train, team_name=team_name, set_sizes=dataset_sizes)
 
