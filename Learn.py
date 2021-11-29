@@ -672,8 +672,8 @@ def main():
     # train_model(model, dataloaders_dict, criterion, optimizer, num_epochs=10)
     # optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
 
-    model = LuxNet(filt=filters); print('Starting new model filters=',filters); skip_first = False
-    # model_path='./model.pth'; model = torch.jit.load(model_path); print('Loading',model_path);skip_first = True
+    # model = LuxNet(filt=filters); print('Starting new model filters=',filters); skip_first = False
+    model_path='C:/Users/vito/Dropbox/Exchange/luxai/models/TB/model8/1127p0/model_2_2_2351.pth'; model = torch.jit.load(model_path); print('Loading',model_path);skip_first = True
 
     # lr = 2e-03
     # for i in range(0,18):
