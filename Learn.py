@@ -554,7 +554,7 @@ def show_eval(dataloaders_dict, map_size, model):
                 skip_first_train=True, Save=False)
 
 
-def show_accuracy_by_map(map_size,model_path, input_sizes, batch_size = 64):
+def show_accuracy_by_map(map_size,model_path, input_sizes, batch_size = 64, eval_dataset=''):
 
     model = torch.jit.load(model_path);
     results = {}
@@ -574,6 +574,8 @@ def show_accuracy_by_map(map_size,model_path, input_sizes, batch_size = 64):
 
     print('------------------------------------------------------------')
     print(model_path)
+    if eval_dataset!='':
+        print(eval_dataset)
     for r in results.items():
         epoch_loss = r[1][0]
         epoch_acc = r[1][1]
@@ -630,8 +632,8 @@ def main():
     #
     model_path = './model.pth'
     model_path = 'C:/Users/vito/Dropbox/Exchange/luxai/models/TB/model8/t1127_0/model_t8_36_1127_8136.pth'
-    show_accuracy_by_map(map_size=map_size, model_path=model_path, input_sizes=[[12],[16],[24],[32],[]])
-    # show_accuracy_by_map(map_size=map_size, model_path=model_path, input_sizes=[[12],[16],[12,16]])
+    show_accuracy_by_map(map_size=map_size, model_path=model_path, input_sizes=[[12],[16],[24],[32],[]], eval_dataset=episode_eval)
+    # show_accuracy_by_map(map_size=map_size, model_path=model_path, input_sizes=[[12],[16],[12,16]], eval_dataset=episode_eval)
     exit()
 
     # APPROACH 1, load episodes from one directory and then split
