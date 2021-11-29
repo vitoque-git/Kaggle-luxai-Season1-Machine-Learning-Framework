@@ -84,7 +84,7 @@ def create_dataset_from_json(episode_dir, team_name='', set_sizes=[], exclude_tu
     episodes = [path for path in Path(episode_dir).glob('*.json') if
                 ('output' not in path.name and '_info' not in path.name)]
 
-    print('create_dataset_from_json,',team_name,':', episode_dir)
+    print('create_dataset_from_json,"',team_name,'"',set_sizes, ':', episode_dir)
     for filepath in episodes:
         episode_samples = []
         episode_obses = {}
