@@ -31,7 +31,7 @@ COMPETITIONS = {
 os.chdir('C:/git/luxai/episodes')
 epagents_df = pd.read_csv("./EpisodeAgents_RL.csv")
 
-sub_to_score_top = [23825143,23825329,23825266,23825370,23825224,23770016,23769678,23770123]
+sub_to_score_top = [23825143,23825329,23825266,23825370,23825224,23770016,23769678,23770123,23939664,23939632]
 BASE_OUTPUT_DIRECTORY = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/'
 SUFFIX_DIRECTORY = 'RL'
 
