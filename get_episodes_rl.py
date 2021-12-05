@@ -8,6 +8,8 @@ import time
 import glob
 import collections
 
+
+
 ## You should configure these to your needs. Choose one of ...
 # 'hungry-geese', 'rock-paper-scissors', santa-2020', 'halite', 'google-football'
 COMP = 'lux-ai-2021'
@@ -31,50 +33,10 @@ COMPETITIONS = {
 os.chdir('C:/git/luxai/episodes')
 epagents_df = pd.read_csv("./EpisodeAgents_RL.csv")
 
-sub_to_score_top = [23825143,23825329,23825266,23825370,23825224,23770016,23769678,23770123,23939664,23939632]
+sub_to_score_top = [23825143,23825329,23825266,23825370,23825224,23770016,23769678,23770123,23939664,23939632,24010503,24010410]
 BASE_OUTPUT_DIRECTORY = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/'
 SUFFIX_DIRECTORY = 'RL'
 
-print(f'EpisodeAgents.csv: {len(epagents_df)} rows before filtering for {sub_to_score_top}.')
-epagents_df = epagents_df[epagents_df.SubmissionId.isin(sub_to_score_top)]
-print(f'EpisodeAgents.csv: {len(epagents_df)} rows after filtering for {sub_to_score_top}.')
-
-episodes_df = pd.read_csv("./Episodes_30067.csv")
-print(f'Episodes.csv: {len(episodes_df)} rows before filtering.')
-episodes_df = episodes_df[episodes_df.Id.isin(epagents_df.EpisodeId)]
-print(f'Episodes.csv: {len(episodes_df)} rows after filtering.')
-
-# Prepare dataframes
-
-
-episodes_df = episodes_df.set_index(['Id'])
-episodes_df['CreateTime'] = pd.to_datetime(episodes_df['CreateTime'])
-episodes_df['EndTime'] = pd.to_datetime(episodes_df['EndTime'])
-
-epagents_df.fillna(0, inplace=True)
-epagents_df = epagents_df.sort_values(by=['Id'], ascending=False)
-
-
-# Get episodes for these submissions
-print('Get episodes for these submissions')
-sub_to_episodes = collections.defaultdict(list)
-for key in sub_to_score_top:
-    eps = sorted(epagents_df[epagents_df['SubmissionId'].isin([key])]['EpisodeId'].values, reverse=True)
-    sub_to_episodes[key] = eps
-
-candidates = len(set([item for sublist in sub_to_episodes.values() for item in sublist]))
-print(f'{candidates} episodes for these {len(sub_to_score_top)} submissions')
-
-global num_api_calls_today
-num_api_calls_today = 0
-all_files = []
-for root, dirs, files in os.walk(MATCH_DIR, topdown=False):
-    all_files.extend(files)
-seen_episodes = [int(f.split('.')[0]) for f in all_files
-                      if '.' in f and f.split('.')[0].isdigit() and f.split('.')[1] == 'json']
-remaining = np.setdiff1d([item for sublist in sub_to_episodes.values() for item in sublist],seen_episodes)
-print(f'{len(remaining)} of these {candidates} episodes not yet saved')
-print('Total of {} games in existing library'.format(len(seen_episodes)))
 
 
 def create_info_json(epid):
@@ -111,7 +73,6 @@ def create_info_json(epid):
 
     return info
 
-
 def saveEpisode(directory,epid) -> bool:
     # request, return whether used the API call
     path_ep = get_path(directory,epid)
@@ -135,35 +96,102 @@ def saveEpisode(directory,epid) -> bool:
 def get_path(directory,epid):
     return '{}/{}.json'.format(directory,epid)
 
-r = BUFFER;
+def dump_episodes():
+    global key, remaining, num_api_calls_today
+    num_api_calls_today = 0
+    r = BUFFER;
+    start_time = datetime.datetime.now()
+    se = 0
+    for key in sub_to_score_top:
+        if num_api_calls_today <= MAX_CALLS_PER_DAY:
+            try:
+                print('')
+                remaining = sorted(np.setdiff1d(sub_to_episodes[key], seen_episodes), reverse=True)
+                print(
+                    f'submission={key}, matches={len(set(sub_to_episodes[key]))}, still to save={len(remaining)}')
+            except:
+                seen_episodes = []
+                print('')
+                remaining = sorted(np.setdiff1d(sub_to_episodes[key], seen_episodes), reverse=True)
+                print(
+                    f'submission={key}, matches={len(set(sub_to_episodes[key]))}, still to save={len(remaining)}')
 
-start_time = datetime.datetime.now()
-se = 0
+            for epid in remaining:
+                directory = BASE_OUTPUT_DIRECTORY + SUFFIX_DIRECTORY + '/' + str(key)
+                if epid not in seen_episodes and num_api_calls_today <= MAX_CALLS_PER_DAY:
+                    if not saveEpisode(directory, epid):
+                        continue  # file already existed, we have not used our API call, we do not need to check, next
+                    r += 1
+                    se += 1
+                    try:
+                        size = os.path.getsize(get_path(directory, epid)) / 1e6
+                        print(str(num_api_calls_today) + f': saved episode #{epid}')
+                        seen_episodes.append(epid)
+                        num_api_calls_today += 1
+                    except:
+                        print('  file {}.json did not seem to save'.format(epid), ':', get_path(directory, epid))
+                    if r > (datetime.datetime.now() - start_time).seconds:
+                        time.sleep(r - (datetime.datetime.now() - start_time).seconds)
+                if num_api_calls_today > (min(3600, MAX_CALLS_PER_DAY)):
+                    break
+    print('')
+    print(f'Episodes saved: {se}')
+
+
+# _____________________MANUAL  __________________________________
+# regex ^.*episode-([0-9]*)".*
+# regex replace with \1
+# submission = '24010410'
+# episodes = [33183221,33166335,33147558,33130419,33112543,33094608,33077464,33076916,33060449,33043579,33026476,33009550,33009549,32992121,32974900,32974547,32959084,32958377,32942048,32925370,32925355,32908390,32892139,32875675,32858581,32841864,32825126,32809441,32804038,32787900,32771739,32755432,32738554,32721892,32706253,32696261,32680453,32681070,32664826,32649140,32633732,32617577,32601582,32585569,32570457,32559547,32555235,32555411,32540113,32525009,32509787,32503188,32489962,32474896,32464232,32449237,32449825,32449469,32448440,32434812,32433446,32419822,32419486,32407442,32395002,32382928,32371173,32360070,32350013,32340129,32330988,32330854,32326221,32318694,32318702,32314274,32313932,32313458,32313114,32312767]
+# sub_to_score_top= [submission]
+# sub_to_episodes = {}
+# sub_to_episodes[submission] = episodes
+# dump_episodes()
+# exit()
+
+print(f'EpisodeAgents.csv: {len(epagents_df)} rows before filtering for {sub_to_score_top}.')
+epagents_df = epagents_df[epagents_df.SubmissionId.isin(sub_to_score_top)]
+print(f'EpisodeAgents.csv: {len(epagents_df)} rows after filtering for {sub_to_score_top}.')
+
+episodes_df = pd.read_csv("./Episodes_30067.csv")
+print(f'Episodes.csv: {len(episodes_df)} rows before filtering.')
+episodes_df = episodes_df[episodes_df.Id.isin(epagents_df.EpisodeId)]
+print(f'Episodes.csv: {len(episodes_df)} rows after filtering.')
+
+# Prepare dataframes
+
+
+episodes_df = episodes_df.set_index(['Id'])
+episodes_df['CreateTime'] = pd.to_datetime(episodes_df['CreateTime'])
+episodes_df['EndTime'] = pd.to_datetime(episodes_df['EndTime'])
+
+epagents_df.fillna(0, inplace=True)
+epagents_df = epagents_df.sort_values(by=['Id'], ascending=False)
+
+
+# Get episodes for these submissions
+print('Get episodes for these submissions')
+sub_to_episodes = collections.defaultdict(list)
 for key in sub_to_score_top:
-    if num_api_calls_today <= MAX_CALLS_PER_DAY:
-        print('')
-        remaining = sorted(np.setdiff1d(sub_to_episodes[key], seen_episodes), reverse=True)
-        print(
-            f'submission={key}, matches={len(set(sub_to_episodes[key]))}, still to save={len(remaining)}')
+    eps = sorted(epagents_df[epagents_df['SubmissionId'].isin([key])]['EpisodeId'].values, reverse=True)
+    sub_to_episodes[key] = eps
 
-        for epid in remaining:
-            directory = BASE_OUTPUT_DIRECTORY + SUFFIX_DIRECTORY + '/' + str(key)
-            if epid not in seen_episodes and num_api_calls_today <= MAX_CALLS_PER_DAY:
-                if not saveEpisode(directory,epid):
-                    continue # file already existed, we have not used our API call, we do not need to check, next
-                r += 1
-                se += 1
-                try:
-                    size = os.path.getsize(get_path(directory,epid)) / 1e6
-                    print(str(num_api_calls_today) + f': saved episode #{epid}')
-                    seen_episodes.append(epid)
-                    num_api_calls_today += 1
-                except:
-                    print('  file {}.json did not seem to save'.format(epid),':', get_path(directory,epid))
-                if r > (datetime.datetime.now() - start_time).seconds:
-                    time.sleep(r - (datetime.datetime.now() - start_time).seconds)
-            if num_api_calls_today > (min(3600, MAX_CALLS_PER_DAY)):
-                break
-print('')
-print(f'Episodes saved: {se}')
+candidates = len(set([item for sublist in sub_to_episodes.values() for item in sublist]))
+print(f'{candidates} episodes for these {len(sub_to_score_top)} submissions')
+
+
+all_files = []
+for root, dirs, files in os.walk(MATCH_DIR, topdown=False):
+    all_files.extend(files)
+seen_episodes = [int(f.split('.')[0]) for f in all_files
+                      if '.' in f and f.split('.')[0].isdigit() and f.split('.')[1] == 'json']
+remaining = np.setdiff1d([item for sublist in sub_to_episodes.values() for item in sublist],seen_episodes)
+print(f'{len(remaining)} of these {candidates} episodes not yet saved')
+print('Total of {} games in existing library'.format(len(seen_episodes)))
+
+dump_episodes()
+
+
+
+
 

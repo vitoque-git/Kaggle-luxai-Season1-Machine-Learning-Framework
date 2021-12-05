@@ -3,8 +3,11 @@ from pathlib import Path
 import os
 from shutil import copyfile, copy, copy2
 
-episode_dir = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/RL/work/1130'
-episode_out = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/RL/work/1130_split/'
+# episode_dir = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/RL/work/1130'
+# episode_out = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/RL/work/1130_split/'
+
+episode_dir = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/RL/work/2401XXX/1201_all'
+episode_out = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/RL/work/2401XXX/1201_split/'
 
 
 episode_out_eval = episode_out+'eval/'
@@ -48,6 +51,8 @@ episodes_to_exclude.extend(['30971591', '30971903', '30972201', '30972497', '309
 episodes_to_exclude.extend(['30971890', '30971906', '30972204', '30972797', '30973095', '30973391', '30973688', '30973989', '30974285', '30974582', '30974877', '30975176', '30975474', '30975776', '30976077'])
 episodes_to_exclude.extend(['31785068', '31785082', '31785418', '31785758', '31786095', '31786433', '31786767', '31787102', '31787437', '31787773', '31788108', '31788443', '31788783', '31789118', '31789456'])
 episodes_to_exclude.extend(['31784732', '31785081', '31785417', '31785757', '31786094', '31786432', '31786768', '31787103', '31787438', '31787774', '31788109', '31788444', '31788784', '31789119', '31789457'])
+episodes_to_exclude.extend(['32300041', '32300054', '32300396', '32300740', '32301085', '32301432', '32301776', '32302121', '32302464', '32302808', '32303150', '32303492', '32303835', '32304178', '32304521'])
+episodes_to_exclude.extend(['32300726', '32301083', '32301430', '32301774', '32302119', '32302463', '32302807', '32303149', '32303491', '32303834', '32304177', '32304520', '32304863', '32305209', '32305551'])
 
 
 

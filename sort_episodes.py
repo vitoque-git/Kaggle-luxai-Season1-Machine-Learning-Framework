@@ -17,6 +17,7 @@ episode_dir = 'C:/git/luxai/episodes/RL/23825329'
 episode_dir = 'C:/git/luxai/episodes/RL/23825370'
 episode_dir = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/RL/23939664'
 episode_dir = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/RL/23939632'
+episode_dir = 'C:/Users/vito/Dropbox/Exchange/luxai/episodes/RL/24010503'
 
 episodes = [path for path in Path(episode_dir).glob('*.json') if
                 ('output' not in path.name and '_info' not in path.name)]
