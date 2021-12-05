@@ -71,6 +71,39 @@ def depleted_resources(obs):
     return True
 
 
+def virtually_won_game_resources(obs, index, turn):
+
+    our_units = 0
+    enemy_units = 0
+    our_city = 0
+    enemy_city = 0
+    for update in obs['updates']:
+        strs = update.split(' ')
+        input_identifier = strs[0]
+
+        if input_identifier == 'u':
+            team = int(strs[2])
+            if team == index:
+                #our team
+                our_units += 1
+            else:
+                # enemy team
+                enemy_units += 1
+
+        elif input_identifier == 'ct':
+            team = int(strs[1])
+            if team == index:
+                # our team
+                our_city += 1
+            else:
+                # enemy team
+                enemy_city += 1
+
+    if min(our_city,our_units) > 8 * min(enemy_city,enemy_units):
+        return True
+
+    return False
+
 def create_dataset_from_json(episode_dir, team_name='', set_sizes=[], exclude_turns_on_after=350):
     if team_name=='':
         print('Need to specify a team name')
@@ -113,6 +146,9 @@ def create_dataset_from_json(episode_dir, team_name='', set_sizes=[], exclude_tu
 
                 #do not add samples in which there are no resources, because they have no value for training (noise)
                 if depleted_resources(obs):
+                    break
+
+                if virtually_won_game_resources(obs,index,i):
                     break
 
                 obs['player'] = index
