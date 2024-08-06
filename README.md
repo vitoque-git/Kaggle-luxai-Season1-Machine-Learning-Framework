@@ -5,6 +5,35 @@ This repository contains the code used to train a machine learning model for the
 A runnable notebook can be found here:
 https://www.kaggle.com/code/vitoque/lux-ai-with-il-decreasing-learning-rate/notebook
 
+
+## Imitation Learning 
+
+The AI model in this project uses a form of imitation learning, where the model is trained to mimic the behavior of an expert or a set of expert demonstrations. In the context of the Lux AI competition, imitation learning involves training the model on a dataset of game episodes where actions taken by the agents are recorded.
+
+### Dataset Collection 
+
+The dataset consists of observations and corresponding actions from game episodes. These observations include various game states such as unit positions, resources, city tiles, and more. The actions represent the decisions made by the agents in those states.
+
+### Training Process 
+
+The model is trained using supervised learning techniques, where the input is the game state, and the output is the action taken by the expert agent. The loss function measures the difference between the predicted actions by the model and the actual actions taken by the expert. The model parameters are updated to minimize this loss, effectively making the model imitate the expert's behavior.
+
+
+```python
+# Example of action prediction
+with torch.set_grad_enabled(phase == 'train'):
+    policy = model(states)
+    loss = criterion(policy, actions)
+    _, preds = torch.max(policy, 1)
+```
+
+### Advantages of Imitation Learning 
+ 
+- **Efficiency** : Imitation learning can leverage a large amount of pre-recorded data, making it efficient to train compared to reinforcement learning, which requires extensive interaction with the environment.
+ 
+- **Simplicity** : The approach simplifies the training process as it directly learns from the expert's decisions without the need for complex reward signals.
+
+This type of imitation learning helps in quickly developing a competitive agent by learning from the strategies and actions of expert players, enabling the model to perform well in the Lux AI competition environment.
 ## Training Methodology 
 
 The training methodology for the Lux AI competition involves several key steps, including data preparation, neural network architecture design, and the training process itself. Below is a detailed explanation of these steps:
